@@ -17,14 +17,14 @@ typedef struct node{
 	struct node *child, *sibling, *parent;
 }NODE;
 
-NODE* initializeNode(char name[],char type){
+NODE* initializeNode(NODE *parent,char name[],char type){
 	NODE * n;
 	n = (NODE *)malloc(sizeof(NODE));
 	strcpy(n->name, name);
 	n->type = type;
 	n->child = NULL;
 	n->sibling = NULL;
-	n->parent = n;
+	n->parent = parent;
 	return n;
 }
 
@@ -37,10 +37,14 @@ int n;
 FILE *fp;
 
 int tokenize(char *pathname){
+	printf("\nThe tokenizing string is %s\n", pathname);
 	n = 0;
 	char *s;
+	printf("\nn = 0\n");	
 	s = strtok(pathname,"/");
+	printf("The first character = %s",s);
 	while(s){
+		printf("\nTokenize: %s", s);
 		name[n] = s;
 		n++;
 		s = strtok(0,"/");
@@ -52,68 +56,160 @@ int tokenize(char *pathname){
 NODE *search_child(NODE* parent, char *name){
 	//TODO fix this so it works:
 		//doesnt work when the node doesnt exist
+
+/*What needs to happen here:
+    Search the child of the node
+	if it is null then return 0;
+	if it is not null
+	    move to it
+	check the nodes name
+	if it is it then return the node
+	else while it has siblings
+	    move to the sibling
+	    check siblings name
+	    if it is then return the node
+	return 0
+*/
+	printf("Starting search_child\n");
+	fflush(stdout);
+
 	if (strcmp(parent->name,name) == 0){ return parent;};
-	if (parent->child != NULL) { parent = parent->child;}
+	printf("1. %s\n", parent->name);
+	fflush(stdout);
+
+	if (parent->child != NULL) { parent = parent->child;
+		printf("2. %s\n", parent->name);
+		fflush(stdout);}
 	else {return 0;} //first step is to go to the child, if the child doesnt exist
 	//				then the parent dir is empty
 	if (strcmp(parent->name,name) == 0){ return parent;}
 	while (parent->sibling){
-		if (strcmp(parent->name,name) == 0){ return parent;}
-		else { parent = parent->sibling;};
+		parent = parent->sibling;
+		printf("3. %s\n", parent->name);
+		fflush(stdout);
 		if (strcmp(parent->name,name) == 0){ return parent;}
 	}
 	return 0;
 }
 
-int search_childtest(){
-	printf("Search Child Test\n");
-	root -> child = initializeNode("a",'D');
-	root -> child -> sibling = initializeNode("b",'D');
-	printf("%s", search_child(root,"b")->name);
-	printf("\nExpected Output: b\n");
-
-}
-
-
 NODE *path2node(char *pathname){
+	/* Searches for the node in the file system
+		that has the same location as specified
+		in the pathname
+	returns null if node does not exist */
 	if (pathname[0] == '/') { start = root; }
 	else {start = cwd;};
+	printf("Tokenize after this");
+	fflush(stdout);
 	n = tokenize(pathname);
+	printf("Tokenized");
+	fflush(stdout);
+
 	NODE *p = start;
 	
 	for (int i=0;i<n;i++){
 		p = search_child(p,name[i]);
-		if (p==0) {return 0;};	
+		if (p==NULL) {return 0;};	
 	}
 	return p;
 }
 
-
-int path2nodetest(){
-	printf("Path2Node test\n");
-	NODE *p = path2node("/a");
-	printf("%s", p->name);
-	p = path2node("/b");
-	printf("%s", p->name);
-	//p = path2node("/b/c");
-	//printf("%d", p);
-	printf("\nExpected Output: ab0\n");
-
-}
 int initializefilesystem(){
 	printf("Starting File System Loading: ...");
-	root = initializeNode( "/" , 'D');
+	root = initializeNode(NULL, "/" , 'D');
 	cwd = root;
 	printf("Done Loading\n");
 	return 0;
 }
+int addChild(NODE *parent, NODE *child){
+	if (parent->child == NULL){
+		parent->child = child;
+		return 0;
+	}
+	else{
+		parent = parent->child;
+		while (parent->sibling){
+			parent = parent->sibling;
+		}
+		parent->sibling = child;
+		return 0;
+	}
+}
+
+int mkdir(char *pathname){
+	/*Check if the pathname already exists. Then using the name
+actually I should be able to start at start
+	we are going to start at the cwd or at the root depending on pathname[0]
+	then we should be able to call find_child on name[n] and name[n+1]
+	nove to when find child returns null
+		call add to parent		
+*/
+	NODE *p = path2node(pathname);
+	NODE *q = start;
+	if (p!= NULL){
+		if(p->type == 'D'){
+			return 0; 
+		}
+	}
+	for(int i=0; i<n;i++){
+		p = search_child(q,name[i]);
+		if (p==NULL){
+			addChild(q,initializeNode(q,name[i],'D'));
+			p = search_child(q,name[i]);
+		}
+		q = p;
+	}
+	return 0;
+}
+
+int mkdirtest (){
+	printf("Mkdir test\n");
+	mkdir("/a/f");
+	mkdir("/o");
+	mkdir("/a");
+	printf("%s", path2node("/a/f")->name);
+	printf("%s", path2node("/o")->name);
+	printf("%s", path2node("/a")->name);
+
+
+	
+
+}
+int search_childtest(){
+	printf("Search Child Test\n");
+	root -> child = initializeNode(root,"a",'D');
+	root -> child -> sibling = initializeNode(root->child,"b",'D');
+	root -> child -> sibling -> child = initializeNode(root->child->sibling,"c",'D');
+	printf("%s", search_child(root,"b")->name);
+	printf("%s", search_child(root->child->sibling,"c")->name);
+	printf("%s", search_child(root,"c")->name);
+
+	printf("\nExpected Output: bc(null)\n");
+
+}
+int path2nodetest(){
+	printf("Path2Node test\n");
+	NODE *p = path2node("/a/");
+	printf("%s", p->name);
+	fflush(stdout);
+	p = path2node("/b");
+	printf("%s", p->name);
+	fflush(stdout);
+	p = path2node("/c");
+	printf("%s", p->name );
+	fflush(stdout);
+	printf("\nExpected Output: ab0\n");
+
+}
+
 		
 int initializefilesystemtest(){
 	printf("Initialize file system test\n");
 	initializefilesystem();
 	printf("%d",strcmp(root->name,"/"));
+	printf("%d",strcmp(cwd->name,"/"));
 	printf("%d",root->type =='D');
-	printf("\nExpected Output:  01\n");
+	printf("\nExpected Output:  001\n");
 }
 
 int tokenizetest(){
@@ -123,25 +219,23 @@ int tokenizetest(){
 	printf("%d",*name[0]=='a');
 	printf("%d",*name[1]=='b');
 	printf("%d",*name[2]=='c');
-	strcpy(pathname, "/b/c/a");
-	printf("%d",*name[0]=='a');
-	printf("%d",*name[1]=='b');
-	printf("%d",*name[2]=='c');
-	printf("\nExptected Output : 111000 \n");	
+	strcpy(pathname, "/b/c");
+	tokenize(pathname);
+	printf("%d",*name[0]=='b');
+	printf("%d",*name[1]=='c');
+	//printf("%d",*name[2]=='a');
+	printf("\nExptected Output : 111111 \n");	
 }
 
 int testsuite(){
 	tokenizetest();
 	initializefilesystemtest();
 	search_childtest();
-	path2nodetest();
+	//path2nodetest();
+	mkdirtest();
 	return 0;
 }
 
-int mkdir(char *pathname){
-	
-	return 0;
-}
 int main(){
 	printf("MAIN Starting");
 	testsuite();	
