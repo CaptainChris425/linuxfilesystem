@@ -37,14 +37,10 @@ int n;
 FILE *fp;
 
 int tokenize(char *pathname){
-	printf("\nThe tokenizing string is %s\n", pathname);
 	n = 0;
 	char *s;
-	printf("\nn = 0\n");	
 	s = strtok(pathname,"/");
-	printf("The first character = %s",s);
 	while(s){
-		printf("\nTokenize: %s", s);
 		name[n] = s;
 		n++;
 		s = strtok(0,"/");
@@ -54,9 +50,6 @@ int tokenize(char *pathname){
 }
 
 NODE *search_child(NODE* parent, char *name){
-	//TODO fix this so it works:
-		//doesnt work when the node doesnt exist
-
 /*What needs to happen here:
     Search the child of the node
 	if it is null then return 0;
@@ -70,23 +63,13 @@ NODE *search_child(NODE* parent, char *name){
 	    if it is then return the node
 	return 0
 */
-	printf("Starting search_child\n");
-	fflush(stdout);
-
 	if (strcmp(parent->name,name) == 0){ return parent;};
-	printf("1. %s\n", parent->name);
-	fflush(stdout);
-
-	if (parent->child != NULL) { parent = parent->child;
-		printf("2. %s\n", parent->name);
-		fflush(stdout);}
+	if (parent->child != NULL) { parent = parent->child;}
 	else {return 0;} //first step is to go to the child, if the child doesnt exist
 	//				then the parent dir is empty
 	if (strcmp(parent->name,name) == 0){ return parent;}
 	while (parent->sibling){
 		parent = parent->sibling;
-		printf("3. %s\n", parent->name);
-		fflush(stdout);
 		if (strcmp(parent->name,name) == 0){ return parent;}
 	}
 	return 0;
@@ -99,14 +82,9 @@ NODE *path2node(char *pathname){
 	returns null if node does not exist */
 	if (pathname[0] == '/') { start = root; }
 	else {start = cwd;};
-	printf("Tokenize after this");
-	fflush(stdout);
+	//pathname[0] == '/' ? start=root : start = cwd;
 	n = tokenize(pathname);
-	printf("Tokenized");
-	fflush(stdout);
-
 	NODE *p = start;
-	
 	for (int i=0;i<n;i++){
 		p = search_child(p,name[i]);
 		if (p==NULL) {return 0;};	
@@ -148,7 +126,10 @@ actually I should be able to start at start
 	NODE *q = start;
 	if (p!= NULL){
 		if(p->type == 'D'){
-			return 0; 
+			//TODO: if it is not a D it still needs to continue and make a 
+				// D type node here
+			printf("Dir already exists");
+			return -1; 
 		}
 	}
 	for(int i=0; i<n;i++){
@@ -162,41 +143,236 @@ actually I should be able to start at start
 	return 0;
 }
 
-int mkdirtest (){
-	printf("Mkdir test\n");
-	//TODO: STRCPY BEFORE CALLING FUNCTION
-	mkdir("/a/f");
-	mkdir("/o");
-	mkdir("/a");
-	printf("%s", path2node("/a/f")->name);
-	printf("%s", path2node("/o")->name);
-	printf("%s", path2node("/a")->name);
 
 
-	
+
+int cd(char *pathname){
+	NODE *p = path2node(pathname);
+	if (p == NULL){
+		printf("Directory was not found\n");	
+	}
+	else if (p->type == 'F'){
+		//if this happens we need a function to continue checking from down the list	
+		return 0;
+	}else{
+		cwd = p;
+	}
+}
+
+int ls(char *pathname){
+//	if (pathname==null){
+//	}
+	NODE *p;
+	if (pathname == NULL){ 
+		p = cwd;
+	}else{
+		p = path2node(pathname);
+	}
+	if (p == NULL){
+		printf("Directory was not found\n");	
+	}
+	else if (p->type == 'F'){
+		//if this happens we need a function to continue checking from down the list	
+		return 0;
+	}else{
+		if (p->child){
+			p = p->child;
+			printf("%c --- %s\n", p->type,p->name);
+			while(p->sibling){
+				p = p->sibling;
+				printf("%c --- %s\n", p->type,p->name);
+			}
+		}
+	}
+	return 0;
+}	
+
+
+int pwdhelper(NODE* start){
+	if (start->parent){
+		pwdhelper(start->parent);
+	}else{
+		printf("/");
+		return 0;
+	}
+	printf("%s/",start->name);
+	return 0;
+}
+
+int pwd(){
+	NODE* p = cwd;		
+	pwdhelper(p);	
+	return 0;
+}
+
+int rmdir(char *pathname){
+	NODE *p = path2node(pathname);
+	if (p){
+		if (p->type == 'F') { printf("rmdir failed - dir specified is a file"); return 0;}
+		if (p->child){ printf("rmdir failed - dir is not empty\n"); return 0;}
+		else{
+			NODE *q = p->parent;
+			if (q->child = p) {q->child = p->sibling; printf("%s removed\n",p->name);}
+			else{
+				q = q->child;
+				while(q->sibling){
+					if (q->sibling == p){ q->sibling = p->sibling;}
+					else{ q = q->sibling; }
+				}
+			}
+		}
+	}	
+	return 0;
+}
+
+int creat(char *pathname){
+	return 0;
+}
+
+int creattest(){
+	printf("Creat test\n");
+	strcpy(pathname, "/a/x");
+	creat(pathname);
+	strcpy(pathname, "/y");
+	creat(pathname);
+	strcpy(pathname, "/z");
+	creat(pathname);
+	strcpy(pathname, "/a/f/l");
+	creat(pathname);
+	strcpy(pathname, "/a/x");
+	printf("%s", path2node(pathname)->name);
+	strcpy(pathname, "/y");
+	printf("%s", path2node(pathname)->name);
+	strcpy(pathname, "/z");
+	printf("%s", path2node(pathname)->name);
+	strcpy(pathname, "/a/f/l");
+	printf("%s", path2node(pathname)->name);
+	printf("\nExpected Output: (already)foa(null)r\n");
 
 }
+
+int rmdirtest (){
+	printf("Rmdir test\n");
+	strcpy(pathname,"/a/f/test");
+	mkdir(pathname);
+	strcpy(pathname,"/a/f/test2");
+	mkdir(pathname);
+	strcpy(pathname,"/a/f");
+	ls(pathname);
+	strcpy(pathname,"/a/f/r");
+	rmdir(pathname);
+	strcpy(pathname,"/a/f");
+	ls(pathname);
+	strcpy(pathname,"/a/f");
+	rmdir(pathname);
+	printf("\nExpected output: removed r & cannot remove f\n");
+}
+
+int pwdtest (){
+	printf("Pwd test\n");
+	strcpy(pathname,"/a/f");
+	cd(pathname);
+	printf("%s\n",cwd->name);
+	pwd();
+	printf("\n");
+	strcpy(pathname,"/b");
+	cd(pathname);
+	printf("%s\n",cwd->name);
+	pwd();
+	printf("\nExpected Output: /a/f /b\n");
+	
+	
+}
+
+int lstest (){
+	printf("Ls test\n");
+	strcpy(pathname,"/a");
+	printf("ls /a\n");
+	ls(pathname);
+	strcpy(pathname,"/");
+	printf("ls / \n");
+	ls(pathname);
+	strcpy(pathname,"/b");
+	printf("ls /b \n");
+	ls(pathname);
+	strcpy(pathname,"/");
+	printf("cd -> / && ls null\n");
+	cd(pathname);
+	ls(NULL);	
+	strcpy(pathname,"/a/f");
+	printf("ls /a/f \n");
+	ls(pathname);
+
+	printf("\nExpected Output: f abocabor\n");
+}
+int cdtest (){
+	printf("Cd test\n");
+	strcpy(pathname,"/o");
+	cd(pathname);
+	printf("%s", cwd->name);
+	strcpy(pathname,"/a/f");
+	cd(pathname);
+	printf("%s", cwd->name);
+	strcpy(pathname,"/a");
+	cd(pathname);
+	printf("%s", cwd->name);
+	strcpy(pathname,"f");
+	cd(pathname);
+	printf("%s", cwd->name);
+	strcpy(pathname,"x");
+	cd(pathname);
+	printf("%s", cwd->name);
+	printf("\nExpected Output: ofaf(notfound)f\n");
+	
+	
+}
+
+int mkdirtest (){
+	printf("Mkdir test\n");
+	strcpy(pathname, "/a/f");
+	mkdir(pathname);
+	strcpy(pathname, "/o");
+	mkdir(pathname);
+	strcpy(pathname, "/a");
+	mkdir(pathname);
+	strcpy(pathname, "/a/f/r");
+	mkdir(pathname);
+	strcpy(pathname, "/a/f");
+	printf("%s", path2node(pathname)->name);
+	strcpy(pathname, "/o");
+	printf("%s", path2node(pathname)->name);
+	strcpy(pathname, "/a");
+	printf("%s", path2node(pathname)->name);
+	strcpy(pathname, "/a/l");
+	printf("%s", path2node(pathname)->name);
+	strcpy(pathname, "/a/f/r");
+	printf("%s", path2node(pathname)->name);
+	printf("\nExpected Output: (already)foa(null)r\n");
+}
+
 int search_childtest(){
 	printf("Search Child Test\n");
 	root -> child = initializeNode(root,"a",'D');
-	root -> child -> sibling = initializeNode(root->child,"b",'D');
+	root -> child -> sibling = initializeNode(root,"b",'D');
 	root -> child -> sibling -> child = initializeNode(root->child->sibling,"c",'D');
 	printf("%s", search_child(root,"b")->name);
 	printf("%s", search_child(root->child->sibling,"c")->name);
 	printf("%s", search_child(root,"c")->name);
-
 	printf("\nExpected Output: bc(null)\n");
 
 }
 int path2nodetest(){
 	printf("Path2Node test\n");
-	NODE *p = path2node("/a/");
+	strcpy(pathname, "/a");
+	NODE *p = path2node(pathname);
 	printf("%s", p->name);
 	fflush(stdout);
-	p = path2node("/b");
+	strcpy(pathname,"/b");
+	p = path2node(pathname);
 	printf("%s", p->name);
 	fflush(stdout);
-	p = path2node("/c");
+	strcpy(pathname,"/c");
+	p = path2node(pathname);
 	printf("%s", p->name );
 	fflush(stdout);
 	printf("\nExpected Output: ab0\n");
@@ -232,13 +408,17 @@ int testsuite(){
 	tokenizetest();
 	initializefilesystemtest();
 	search_childtest();
-	//path2nodetest();
+	path2nodetest();
 	mkdirtest();
+	cdtest();
+	lstest();
+	pwdtest();
+	rmdirtest();
 	return 0;
 }
 
 int main(){
-	printf("MAIN Starting");
+	printf("MAIN Starting\n");
 	testsuite();	
 	printf("MAIN Success\n");
 	return 0;
