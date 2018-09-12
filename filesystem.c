@@ -164,6 +164,7 @@ actually I should be able to start at start
 
 int mkdirtest (){
 	printf("Mkdir test\n");
+	//TODO: STRCPY BEFORE CALLING FUNCTION
 	mkdir("/a/f");
 	mkdir("/o");
 	mkdir("/a");
