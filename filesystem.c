@@ -6,11 +6,10 @@ Linux File System
 //TODO : Abstract tree and node functions away from main file
 // 		do not do until functional. too hard to start that way
 
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 typedef struct node{
 	char name[64];
 	char type;
@@ -172,23 +171,28 @@ int creat(char *pathname){
 }
 
 int cd(char *pathname){
+	if (!strcmp(pathname,"") || !strcmp(pathname,"\n")){ 
+		cwd = root;
+		return 0;
+	}
+	else if (!strcmp(pathname,"..")){
+		cwd = cwd->parent;
+		return 0;
+	}
 	NODE *p = path2node(pathname,'D');
 	if (p == NULL){
 		printf("Directory was not found\n");	
-	}
-	else if (p->type == 'F'){
-		//if this happens we need a function to continue checking from down the list	
-		return 0;
 	}else{
 		cwd = p;
 	}
+	return 0;
 }
 
 int ls(char *pathname){
 //	if (pathname==null){
 //	}
 	NODE *p;
-	if (pathname == NULL || pathname == "\n"){ 
+	if (!strcmp(pathname,"") ||!strcmp(pathname,"\n")){ 
 		p = cwd;
 	}else{
 		p = path2node(pathname, 'D');
@@ -232,11 +236,14 @@ int rmdir(char *pathname){
 		if (p->child){ printf("rmdir failed - dir is not empty\n"); return 0;}
 		else{
 			NODE *q = p->parent;
-			if (q->child = p) {q->child = p->sibling; printf("%s removed\n",p->name);}
+			if (q->child == p) {q->child = p->sibling; printf("%s removed\n",p->name);}
 			else{
 				q = q->child;
 				while(q->sibling){
-					if (q->sibling == p){ q->sibling = p->sibling;}
+					if (q->sibling == p){ 
+						q->sibling = p->sibling;
+						printf("%s removed\n",p->name);
+					}
 					else{ q = q->sibling; }
 				}
 			}
@@ -275,10 +282,11 @@ int menu(){
 		"cd [pathname] : Changes cwd to pathname or '/' if not specified\n" \
 		"ls [pathname] : Lists the content of the cwd or pathname\n" \
 		"pwd		: Prints the absolute pathname\n" \
-		"creat [pathname] : Creates a FILE at specified pathname\n" \
-		"rm [pathname] : Removes the file at pathname\n" \
-		"save [filename] : Saves the file tree to filename\n" \
-		"load [filename] : Loads the file tree from filename\n" \
+		"creat pathname : Creates a FILE at specified pathname\n" \
+		"rm pathname : Removes the file at pathname\n" \
+		"save filename : Saves the file tree to filename\n" \
+		"load filename : Loads the file tree from filename\n" \
+		"quit		: Saves the tree structure to a file and quits\n"\
 		"=====================================================\n");
 	return 0;
 }
@@ -528,6 +536,7 @@ int testsuite(){
 }
 
 char *cmd[] = {"mkdir","rmdir","ls","cd","pwd","creat","rm","quit","menu","reload","save",NULL};
+
 int findCmd(char *command){
 	int i = 0;
 	while(cmd[i]){
@@ -549,16 +558,20 @@ int main(){
 	int index;
 	initializefilesystem();
 	while(1){
+		NODE* p = cwd;		
+		printf("~");
+		pwdhelper(p);
+		printf("$ ");
 		fgets(line,128,stdin);
 		line[strlen(line)-1] = 0;
 		pathname[0] = 0;
 		sscanf(line, "%s %s", command, pathname);
-		printf("pathname = %c",pathname[0]);
 		index = findCmd(command);
-		int r = fptr[index](pathname);
+		if (index == -1){
+			printf("Command not found\n");
+		}else{
+			int r = fptr[index](pathname);
+		}
 	}
-
-
-			
 	return 0;
 }
