@@ -49,7 +49,7 @@ int tokenize(char *pathname){
 		
 }
 
-NODE *search_child(NODE* parent, char *name){
+NODE *search_child(NODE* parent, char *name,char type){
 /*What needs to happen here:
     Search the child of the node
 	if it is null then return 0;
@@ -63,19 +63,19 @@ NODE *search_child(NODE* parent, char *name){
 	    if it is then return the node
 	return 0
 */
-	if (strcmp(parent->name,name) == 0){ return parent;};
+	if (strcmp(parent->name,name) == 0&& parent->type == type){ return parent;};
 	if (parent->child != NULL) { parent = parent->child;}
 	else {return 0;} //first step is to go to the child, if the child doesnt exist
 	//				then the parent dir is empty
-	if (strcmp(parent->name,name) == 0){ return parent;}
+	if (strcmp(parent->name,name) == 0&& parent->type == type){ return parent;}
 	while (parent->sibling){
 		parent = parent->sibling;
-		if (strcmp(parent->name,name) == 0){ return parent;}
+		if (strcmp(parent->name,name) == 0 && parent->type == type){ return parent;}
 	}
 	return 0;
 }
 
-NODE *path2node(char *pathname){
+NODE *path2node(char *pathname, char type){
 	/* Searches for the node in the file system
 		that has the same location as specified
 		in the pathname
@@ -85,9 +85,18 @@ NODE *path2node(char *pathname){
 	//pathname[0] == '/' ? start=root : start = cwd;
 	n = tokenize(pathname);
 	NODE *p = start;
-	for (int i=0;i<n;i++){
-		p = search_child(p,name[i]);
-		if (p==NULL) {return 0;};	
+	if (type == 'D'){
+		for (int i=0;i<n;i++){
+			p = search_child(p,name[i],type);
+			if (p==NULL) {return 0;};	
+		}
+	}else{
+		for (int i=0;i<n-1;i++){
+			p = search_child(p,name[i],'D');
+			if (p==NULL) {return 0;};	
+		}
+		p = search_child(p,name[n-1],type);
+		if (p==NULL){return 0;}
 	}
 	return p;
 }
@@ -99,6 +108,7 @@ int initializefilesystem(){
 	printf("Done Loading\n");
 	return 0;
 }
+
 int addChild(NODE *parent, NODE *child){
 	if (parent->child == NULL){
 		parent->child = child;
@@ -122,32 +132,47 @@ actually I should be able to start at start
 	nove to when find child returns null
 		call add to parent		
 */
-	NODE *p = path2node(pathname);
+	NODE *p = path2node(pathname,'D');
 	NODE *q = start;
 	if (p!= NULL){
-		if(p->type == 'D'){
-			//TODO: if it is not a D it still needs to continue and make a 
-				// D type node here
-			printf("Dir already exists");
-			return -1; 
-		}
+		printf("Dir already exists");
+		return -1;
 	}
 	for(int i=0; i<n;i++){
-		p = search_child(q,name[i]);
+		p = search_child(q,name[i],'D');
 		if (p==NULL){
 			addChild(q,initializeNode(q,name[i],'D'));
-			p = search_child(q,name[i]);
+			p = search_child(q,name[i],'D');
 		}
 		q = p;
 	}
 	return 0;
 }
 
-
-
+int creat(char *pathname){
+	NODE *p = path2node(pathname,'F');
+	NODE *q = start;
+	if (p!= NULL){
+		printf("File already exists\n");
+		return -1;
+	}		
+	for (int i=0;i<n-1;i++){
+		p = search_child(q,name[i],'D');
+		if (p==NULL){
+			addChild(q,initializeNode(q,name[i],'D'));
+			p = search_child(q,name[i],'D');
+		}
+		q = p;
+	}
+	p = search_child(q,name[n-1],'F');
+	if (p==NULL){
+		addChild(q,initializeNode(q,name[n-1],'F'));
+	}else{printf("File already exists\n");}
+	return 0;
+}
 
 int cd(char *pathname){
-	NODE *p = path2node(pathname);
+	NODE *p = path2node(pathname,'D');
 	if (p == NULL){
 		printf("Directory was not found\n");	
 	}
@@ -166,14 +191,10 @@ int ls(char *pathname){
 	if (pathname == NULL){ 
 		p = cwd;
 	}else{
-		p = path2node(pathname);
+		p = path2node(pathname, 'D');
 	}
 	if (p == NULL){
 		printf("Directory was not found\n");	
-	}
-	else if (p->type == 'F'){
-		//if this happens we need a function to continue checking from down the list	
-		return 0;
 	}else{
 		if (p->child){
 			p = p->child;
@@ -186,7 +207,6 @@ int ls(char *pathname){
 	}
 	return 0;
 }	
-
 
 int pwdhelper(NODE* start){
 	if (start->parent){
@@ -206,9 +226,8 @@ int pwd(){
 }
 
 int rmdir(char *pathname){
-	NODE *p = path2node(pathname);
+	NODE *p = path2node(pathname,'D');
 	if (p){
-		if (p->type == 'F') { printf("rmdir failed - dir specified is a file"); return 0;}
 		if (p->child){ printf("rmdir failed - dir is not empty\n"); return 0;}
 		else{
 			NODE *q = p->parent;
@@ -221,11 +240,53 @@ int rmdir(char *pathname){
 				}
 			}
 		}
-	}	
+	}else{
+		printf("Dir was not found to remove\n");	
+	}
 	return 0;
 }
 
-int creat(char *pathname){
+int rm(char *pathname){
+	NODE *p = path2node(pathname,'F');
+	if (p){
+		NODE *q = p->parent;
+		if (q->child == p) {q->child = p->sibling; printf("%s removed\n",p->name);}
+		else{
+			q = q->child;
+			while(q->sibling){
+				if (q->sibling == p){
+					q->sibling = p->sibling;
+					printf("%s removed\n",p->name);
+					return 0;}
+				else{ q = q->sibling; }
+			}
+		}
+	}else{
+		printf("File was not found to remove\n");
+	}	
+
+}
+
+int menu(){
+	printf("=====================================================\n" \
+		"mkdir pathname : Makes a new directory at specified pathname\n" \
+		"rmdir pathname : Removes the directory, if it is empty\n" \
+		"cd [pathname] : Changes cwd to pathname or '/' if not specified\n" \
+		"ls [pathname] : Lists the content of the cwd or pathname\n" \
+		"pwd		: Prints the absolute pathname\n" \
+		"creat [pathname] : Creates a FILE at specified pathname\n" \
+		"rm [pathname] : Removes the file at pathname\n" \
+		"save [filename] : Saves the file tree to filename\n" \
+		"load [filename] : Loads the file tree from filename\n" \
+		"=====================================================\n");
+	return 0;
+}
+
+int quit(char *pathname){
+	exit(0);}
+
+int menutest(){
+	menu();
 	return 0;
 }
 
@@ -237,17 +298,61 @@ int creattest(){
 	creat(pathname);
 	strcpy(pathname, "/z");
 	creat(pathname);
-	strcpy(pathname, "/a/f/l");
+	strcpy(pathname, "/a/f/l/r");
 	creat(pathname);
-	strcpy(pathname, "/a/x");
-	printf("%s", path2node(pathname)->name);
-	strcpy(pathname, "/y");
-	printf("%s", path2node(pathname)->name);
-	strcpy(pathname, "/z");
-	printf("%s", path2node(pathname)->name);
+	fflush(stdout);
+	NODE* p;
 	strcpy(pathname, "/a/f/l");
-	printf("%s", path2node(pathname)->name);
-	printf("\nExpected Output: (already)foa(null)r\n");
+	ls(pathname);
+	strcpy(pathname, "/a/x");
+	p = path2node(pathname,'F');
+	printf("%c --- %s\n", p->type,p->name);
+
+	strcpy(pathname, "/y");
+	p = path2node(pathname,'F');
+	printf("%c --- %s\n", p->type,p->name);
+
+	strcpy(pathname, "/z");
+	p = path2node(pathname,'F');
+	printf("%c --- %s\n", p->type,p->name);
+
+	strcpy(pathname, "/a/f/l/r");
+	p = path2node(pathname,'F');
+	printf("%c --- %s\n", p->type,p->name);
+
+	printf("\nExpected Output: xyzl\n");
+
+}
+
+int rmtest(){
+	printf("Rm test\n");
+	strcpy(pathname,"/a/f");
+	ls(pathname);
+	printf("Before adding files^^\n");
+
+	strcpy(pathname,"/a/f/test");
+	creat(pathname);
+	strcpy(pathname,"/a/f/test2");
+	creat(pathname);
+	strcpy(pathname,"/a/f");
+	printf("\n");
+	ls(pathname);
+	printf("\n");
+	strcpy(pathname,"/a/f/test");
+	rm(pathname);
+	strcpy(pathname,"/a/f");
+	printf("\n");
+	ls(pathname);
+	printf("\n");
+	strcpy(pathname,"/a/f/test2");
+	rm(pathname);
+	strcpy(pathname,"/a/f/test2");
+	rm(pathname);
+	strcpy(pathname,"/a/f");
+	printf("\n");
+	ls(pathname);
+	printf("\n");
+	printf("\nExpected output: removed test&test2 (cannot find)\n");
 
 }
 
@@ -305,6 +410,7 @@ int lstest (){
 
 	printf("\nExpected Output: f abocabor\n");
 }
+
 int cdtest (){
 	printf("Cd test\n");
 	strcpy(pathname,"/o");
@@ -338,15 +444,15 @@ int mkdirtest (){
 	strcpy(pathname, "/a/f/r");
 	mkdir(pathname);
 	strcpy(pathname, "/a/f");
-	printf("%s", path2node(pathname)->name);
+	printf("%s", path2node(pathname,'D')->name);
 	strcpy(pathname, "/o");
-	printf("%s", path2node(pathname)->name);
+	printf("%s", path2node(pathname,'D')->name);
 	strcpy(pathname, "/a");
-	printf("%s", path2node(pathname)->name);
+	printf("%s", path2node(pathname,'D')->name);
 	strcpy(pathname, "/a/l");
-	printf("%s", path2node(pathname)->name);
+	printf("%s", path2node(pathname,'D')->name);
 	strcpy(pathname, "/a/f/r");
-	printf("%s", path2node(pathname)->name);
+	printf("%s", path2node(pathname,'D')->name);
 	printf("\nExpected Output: (already)foa(null)r\n");
 }
 
@@ -355,31 +461,31 @@ int search_childtest(){
 	root -> child = initializeNode(root,"a",'D');
 	root -> child -> sibling = initializeNode(root,"b",'D');
 	root -> child -> sibling -> child = initializeNode(root->child->sibling,"c",'D');
-	printf("%s", search_child(root,"b")->name);
-	printf("%s", search_child(root->child->sibling,"c")->name);
-	printf("%s", search_child(root,"c")->name);
+	printf("%s", search_child(root,"b",'D')->name);
+	printf("%s", search_child(root->child->sibling,"c",'D')->name);
+	printf("%s", search_child(root,"c",'D')->name);
 	printf("\nExpected Output: bc(null)\n");
 
 }
+
 int path2nodetest(){
 	printf("Path2Node test\n");
 	strcpy(pathname, "/a");
-	NODE *p = path2node(pathname);
+	NODE *p = path2node(pathname,'D');
 	printf("%s", p->name);
 	fflush(stdout);
 	strcpy(pathname,"/b");
-	p = path2node(pathname);
+	p = path2node(pathname,'D');
 	printf("%s", p->name);
 	fflush(stdout);
 	strcpy(pathname,"/c");
-	p = path2node(pathname);
+	p = path2node(pathname,'D');
 	printf("%s", p->name );
 	fflush(stdout);
 	printf("\nExpected Output: ab0\n");
 
 }
 
-		
 int initializefilesystemtest(){
 	printf("Initialize file system test\n");
 	initializefilesystem();
@@ -405,6 +511,7 @@ int tokenizetest(){
 }
 
 int testsuite(){
+	menutest();
 	tokenizetest();
 	initializefilesystemtest();
 	search_childtest();
@@ -414,12 +521,41 @@ int testsuite(){
 	lstest();
 	pwdtest();
 	rmdirtest();
+	creattest();
+	rmtest();
 	return 0;
 }
 
+char *cmd[] = {"mkdir","rmdir","ls","cd","pwd","creat","rm","quit","reload","save","menu",NULL};
+int findCmd(char *command){
+	int i = 0;
+	while(cmd[i]){
+		if (!strcmp(command,cmd[i])){
+			return i; }
+		i++;
+	}
+	return -1;
+}
+
+int (*fptr[])(char *) = { (int (*) ())mkdir,rmdir,ls,cd,pwd,creat,rm,quit};
+
 int main(){
+/*
 	printf("MAIN Starting\n");
 	testsuite();	
 	printf("MAIN Success\n");
+*/
+	int index;
+	initializefilesystem();
+	while(1){
+		fgets(line,128,stdin);
+		line[strlen(line)-1] = 0;
+		sscanf(line, "%s %s", command, pathname);
+		index = findCmd(command);
+		int r = fptr[index](pathname);
+	}
+
+
+			
 	return 0;
 }
